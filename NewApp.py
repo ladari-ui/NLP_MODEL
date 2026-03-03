@@ -1,155 +1,153 @@
 import streamlit as st
 import joblib
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+import random
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="Emotion AI Analyzer",
-    page_icon="🧠",
+    page_title="Emotion Analyzer AI",
+    page_icon="😊",
     layout="centered"
 )
 
 # ---------------- LOAD MODEL ----------------
-@st.cache_resource
-def load_model():
-    model = joblib.load("emotion_model.pkl")
-    vectorizer = joblib.load("vectorizer.pkl")
-    return model, vectorizer
+model = joblib.load("emotion_model.pkl")
+vectorizer = joblib.load("vectorizer.pkl")
 
-model, vectorizer = load_model()
+# ---------------- TITLE ----------------
+st.markdown(
+    """
+    <h1 style='text-align: center; color: #4CAF50;'>
+        😊 Emotion Analyzer AI
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
 
-# ---------------- EMOTION STYLES ----------------
-emotion_styles = {
-    "joy": {"emoji": "😄", "color": "#28a745"},
-    "sadness": {"emoji": "😢", "color": "#007bff"},
-    "anger": {"emoji": "😠", "color": "#dc3545"},
-    "fear": {"emoji": "😨", "color": "#6f42c1"},
-    "love": {"emoji": "❤️", "color": "#e83e8c"},
-    "surprise": {"emoji": "😲", "color": "#fd7e14"}
+st.markdown("---")
+
+# ---------------- USER INPUT ----------------
+user_input = st.text_area("Enter your text:", height=150)
+
+# ---------------- EMOTION EMOJIS ----------------
+emotion_emojis = {
+    "joy": "😄",
+    "sadness": "😢",
+    "anger": "😡",
+    "fear": "😨",
+    "love": "❤️",
+    "surprise": "😲"
 }
 
-emotion_suggestions = {
-    "joy": "Keep spreading positivity! 🌟",
-    "sadness": "Take a deep breath. Go for a short walk.",
-    "anger": "Pause and breathe slowly. Try some movement.",
-    "fear": "You are stronger than you think.",
-    "love": "Share your gratitude with someone.",
-    "surprise": "Enjoy the unexpected moment!"
-}
+# ---------------- PREDICTION ----------------
+if st.button("Analyze Emotion"):
 
-# ---------------- MINI GAME ----------------
-def mini_game():
-    st.markdown("### 🎮 Mini Mood Game")
-    st.write("Click the emoji that matches your predicted emotion!")
-
-    col1, col2, col3 = st.columns(3)
-
-    clicked = None
-    with col1:
-        if st.button("😄"):
-            clicked = "joy"
-    with col2:
-        if st.button("😢"):
-            clicked = "sadness"
-    with col3:
-        if st.button("😠"):
-            clicked = "anger"
-
-    if clicked:
-        if clicked == st.session_state.get("last_prediction"):
-            st.success("Correct! 🎉 Great job!")
-        else:
-            st.warning("Not quite! Try again!")
-
-# ---------------- SIDEBAR ----------------
-st.sidebar.title("🧠 Emotion AI")
-page = st.sidebar.radio("Navigation", ["Home", "Input", "Output"])
-
-# ---------------- HOME PAGE ----------------
-if page == "Home":
-    st.title("🧠 Emotion AI Analyzer")
-    st.markdown("""
-    This AI-powered app:
-    - Detects emotion from your text  
-    - Shows confidence percentage  
-    - Displays probability graph  
-    - Suggests mood improvement tips  
-    - Includes a fun mini game  
-
-    Built with Machine Learning + Streamlit 🚀
-    """)
-
-# ---------------- INPUT PAGE ----------------
-elif page == "Input":
-    st.header("💬 Enter Your Text")
-    user_input = st.text_area("How are you feeling today?")
-
-    if st.button("Submit"):
-        if user_input.strip() == "":
-            st.warning("Please enter some text.")
-        else:
-            st.session_state["user_text"] = user_input
-            st.success("Text submitted! Go to Output page.")
-
-# ---------------- OUTPUT PAGE ----------------
-elif page == "Output":
-
-    if "user_text" not in st.session_state:
-        st.info("Please enter text in the Input page first.")
+    if user_input.strip() == "":
+        st.warning("Please enter some text.")
     else:
-        text = st.session_state["user_text"]
-        st.subheader("Your Text")
-        st.write(f"> {text}")
+        # Vectorize
+        vect_input = vectorizer.transform([user_input])
 
-        text_vec = vectorizer.transform([text])
-        prediction = model.predict(text_vec)[0]
+        # Predict
+        prediction = model.predict(vect_input)[0]
+        probabilities = model.predict_proba(vect_input)[0]
 
-        # Confidence
-        if hasattr(model, "predict_proba"):
-            probabilities = model.predict_proba(text_vec)[0]
-            confidence = np.max(probabilities) * 100
-            labels = model.classes_
-        else:
-            confidence = 100
-            probabilities = [1]
-            labels = [prediction]
+        confidence = np.max(probabilities) * 100
 
-        st.session_state["last_prediction"] = prediction
+        st.markdown("## 🔍 Prediction Result")
 
-        style = emotion_styles.get(prediction, {"emoji": "", "color": "black"})
+        emoji = emotion_emojis.get(prediction, "")
 
-        st.markdown("## 🎯 Prediction Result")
+        st.success(f"**Emotion:** {prediction.upper()} {emoji}")
+        st.info(f"**Confidence:** {confidence:.2f}%")
 
-        st.markdown(
-            f"<h2 style='color:{style['color']}'>{style['emoji']} {prediction.upper()}</h2>",
-            unsafe_allow_html=True
+        st.progress(float(confidence / 100))
+
+        # ---------------- PROBABILITY GRAPH ----------------
+        st.markdown("### 📊 Emotion Probability Distribution")
+
+        fig = plt.figure()
+        plt.bar(model.classes_, probabilities)
+        plt.xlabel("Emotions")
+        plt.ylabel("Probability")
+        plt.title("Prediction Confidence for Each Emotion")
+        st.pyplot(fig)
+
+        st.markdown("---")
+
+        # ---------------- SUGGESTIONS ----------------
+        st.markdown("### 💡 Suggestion")
+
+        suggestions = {
+            "joy": "Keep spreading positivity and happiness! 🌟",
+            "sadness": "Take a break and talk to someone you trust 💙",
+            "anger": "Try deep breathing or a short walk 🚶‍♂️",
+            "fear": "Everything will be okay. Stay calm and strong 💪",
+            "love": "Beautiful emotion! Share it with the world ❤️",
+            "surprise": "Hope it’s a good one! Stay curious 😄"
+        }
+
+        st.write(suggestions.get(prediction, ""))
+
+        st.markdown("---")
+
+        # ---------------- MINI GAMES ----------------
+        st.markdown("## 🎮 Mood Booster Games")
+
+        game_choice = st.radio(
+            "Choose a game:",
+            ["🎯 Number Guessing", "🎈 Inflate the Balloon"]
         )
 
-        # Confidence bar
-        st.subheader("Confidence Level")
-        st.progress(int(confidence))
-        st.write(f"**{confidence:.2f}% confident**")
+        # ---------------- NUMBER GUESSING GAME ----------------
+        if game_choice == "🎯 Number Guessing":
 
-        # Probability Graph
-        if hasattr(model, "predict_proba"):
-            st.subheader("📊 Emotion Probability Distribution")
+            if "secret_number" not in st.session_state:
+                st.session_state.secret_number = random.randint(1, 10)
 
-            prob_df = pd.DataFrame({
-                "Emotion": labels,
-                "Probability": probabilities
-            })
+            st.write("Guess a number between 1 and 10")
 
-            fig, ax = plt.subplots()
-            ax.bar(prob_df["Emotion"], prob_df["Probability"])
-            ax.set_ylabel("Probability")
-            ax.set_ylim([0, 1])
-            st.pyplot(fig)
+            guess = st.number_input(
+                "Enter your guess:",
+                min_value=1,
+                max_value=10,
+                step=1
+            )
 
-        # Suggestion
-        st.markdown("### 💡 Suggestion")
-        st.info(emotion_suggestions.get(prediction, "Stay positive!"))
+            if st.button("Check Guess"):
+                if guess == st.session_state.secret_number:
+                    st.success("🎉 Correct! You guessed it!")
+                    st.session_state.secret_number = random.randint(1, 10)
+                elif guess < st.session_state.secret_number:
+                    st.warning("Too low! Try again.")
+                else:
+                    st.warning("Too high! Try again.")
 
-        # Mini Game
-        mini_game()
+        # ---------------- BALLOON GAME ----------------
+        elif game_choice == "🎈 Inflate the Balloon":
+
+            if "balloon_size" not in st.session_state:
+                st.session_state.balloon_size = 50
+
+            st.write("Click inflate to grow the balloon — but don't pop it! 💥")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("Inflate 🎈"):
+                    st.session_state.balloon_size += 10
+
+            with col2:
+                if st.button("Reset Balloon"):
+                    st.session_state.balloon_size = 50
+
+            # Display balloon
+            st.markdown(
+                f"<div style='text-align:center; font-size:{st.session_state.balloon_size}px;'>🎈</div>",
+                unsafe_allow_html=True
+            )
+
+            if st.session_state.balloon_size > 150:
+                st.error("💥 Boom! The balloon popped!")
+                st.session_state.balloon_size = 50
